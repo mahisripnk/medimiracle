@@ -1,0 +1,60 @@
+name: medimiracle-ios-build
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-ios:
+    name: 🎉 iOS Build for MediMiracle
+    runs-on: macos-latest
+
+    steps:
+      # Checkout the repository
+      - uses: actions/checkout@v3
+
+      # Set up Flutter with the stable channel and x64 architecture
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          architecture: x64
+
+      # Install Flutter dependencies
+      - run: flutter pub get
+
+      # Update CocoaPods repository
+      - run: pod repo update
+        working-directory: ios
+
+      # Build the iOS app in release mode with no code signing (for distribution)
+      - run: flutter build ipa --release --no-codesign
+
+      # Optional: If needed, build with specific options for native splash and flutter_svg
+      - name: Ensure iOS Build Requirements
+        run: |
+          cd ios
+          pod install
+          cd ..
+
+      # Create a Payload directory (this step might not be needed with 'flutter build ipa')
+      - run: mkdir Payload
+        working-directory: build/ios/ipa
+
+      # Move the built .app file into Payload (if necessary, else 'flutter build ipa' handles it)
+      - run: mv Runner.app/ Payload
+        working-directory: build/ios/ipa
+
+      # Zip the Payload folder to create the .ipa file
+      - name: Zip IPA File
+        run: zip -qq -r -9 FlutterIpaExport.ipa Payload
+        working-directory: build/ios/ipa
+
+      # Upload the generated IPA to the release section in GitHub
+      - name: Upload IPA to GitHub Release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: build/ios/ipa/FlutterIpaExport.ipa
+          tag: v1.0
+          overwrite: true
+          body: "This is the first iOS release for MediMiracle"
+
